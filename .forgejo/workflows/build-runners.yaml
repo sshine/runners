@@ -19,4 +19,4 @@ jobs:
 
       - name: Push image to registry
         run: |
-          nix run nixpkgs#skopeo copy --dest-creds forgejo_admin:${{ secrets.FORGEJO_TOKEN }} docker-archive:result docker://git.shine.town/infra/runners/nixos:latest
+          nix run nixpkgs#skopeo -- copy --dest-creds forgejo_admin:${{ secrets.FORGEJO_TOKEN }} docker-archive:result docker://git.shine.town/infra/runners/nixos:latest
