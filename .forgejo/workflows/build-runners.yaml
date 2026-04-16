@@ -26,7 +26,7 @@ jobs:
 
       - name: Tag and push image
         run: |
-          REPO="git.shine.town/infra/runner-images/nixos"
+          REPO="git.shine.town/infra/runners/nixos"
           TAG="${REPO}:latest"
           IMAGE_ID=$(docker images --quiet --filter "reference=nixos-runner*")
           docker tag "$IMAGE_ID" "$TAG"
