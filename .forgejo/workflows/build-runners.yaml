@@ -17,8 +17,8 @@ jobs:
         run: .forgejo/scripts/install-nix.sh
 
       - name: Build runner image
-        run: nix build .#nixos-runner -o nixos-runner.tar.gz
+        run: nix build .#nixos-unstable -o nixos-unstable.tar.gz
 
       - name: Push image to registry
         run: |
-          nix run nixpkgs#skopeo -- copy --insecure-policy --dest-creds forgejo_admin:${{ secrets.RUNNERS_PACKAGE_UPLOAD_KEY }} docker-archive:nixos-runner.tar.gz docker://git.shine.town/infra/runners/nixos:latest
+          nix run nixpkgs#skopeo -- copy --insecure-policy --dest-creds forgejo_admin:${{ secrets.RUNNERS_PACKAGE_UPLOAD_KEY }} docker-archive:nixos-unstable.tar.gz docker://git.shine.town/infra/runners/nixos-unstable:latest

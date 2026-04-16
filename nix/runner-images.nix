@@ -4,7 +4,7 @@
     { pkgs, ... }:
     {
       packages = {
-        nixos-runner = config.lib.nixosRunner { inherit pkgs; };
+        nixos-unstable = config.lib.nixosRunner { inherit pkgs; };
       };
     };
 }
