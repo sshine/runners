@@ -7,7 +7,7 @@ if command -v nix &>/dev/null; then
 fi
 
 echo "Installing Nix..."
-curl -fsSL https://install.determinate.systems/nix | sh -s -- install
+curl -fsSL https://install.determinate.systems/nix | sh -s -- install --no-confirm
 
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh 2>/dev/null || true
 
