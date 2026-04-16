@@ -17,17 +17,6 @@ jobs:
       - name: Build runner image
         run: nix build .#nixos-runner
 
-      - name: Load image into Docker
-        run: docker load < result
-
-      - name: Log in to Forgejo registry
+      - name: Push image to registry
         run: |
-          echo "${{ secrets.FORGEJO_TOKEN }}" | docker login git.shine.town -u forgejo_admin --password-stdin
-
-      - name: Tag and push image
-        run: |
-          REPO="git.shine.town/infra/runners/nixos"
-          TAG="${REPO}:latest"
-          IMAGE_ID=$(docker images --quiet --filter "reference=nixos-runner*")
-          docker tag "$IMAGE_ID" "$TAG"
-          docker push "$TAG"
+          nix run nixpkgs#skopeo copy --dest-creds forgejo_admin:${{ secrets.FORGEJO_TOKEN }} docker-archive:result docker://git.shine.town/infra/runners/nixos:latest
