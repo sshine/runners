@@ -8,11 +8,13 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Nix
-        run: bash install-nix.sh
+        run: .forgejo/scripts/install-nix.sh
 
       - name: Build runner image
         run: nix build .#nixos-runner
