@@ -22,3 +22,12 @@ jobs:
       - name: Push image to registry
         run: |
           nix run nixpkgs#skopeo -- copy --insecure-policy --dest-creds forgejo_admin:${{ secrets.RUNNERS_PACKAGE_UPLOAD_KEY }} docker-archive:nixos-unstable.tar.gz docker://git.shine.town/infra/runners/nixos-unstable:latest
+
+  test-image:
+    needs: build-and-push
+    runs-on: nixos-unstable
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build runner image
+        run: nix build .#nixos-unstable
