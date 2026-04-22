@@ -47,6 +47,7 @@ let
           pkgs.file
           pkgs.gnumake
           pkgs.cpio
+          pkgs.nodejs
         ];
         pathsToLink = [
           "/bin"
