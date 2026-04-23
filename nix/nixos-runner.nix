@@ -29,6 +29,7 @@ let
           nixProfile
           pkgs.bashInteractive
           pkgs.coreutils
+          pkgs.diffutils
           pkgs.git
           pkgs.git-lfs
           pkgs.curl
