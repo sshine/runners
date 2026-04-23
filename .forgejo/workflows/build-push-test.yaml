@@ -1,0 +1,49 @@
+name: Build, push and test runner images
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        run: .forgejo/scripts/install-nix.sh
+
+      - name: Build runner image
+        run: nix build .#nixos -o nixos.tar.gz
+
+      - name: Extract nixpkgs date
+        id: nixpkgs-date
+        run: |
+          last_modified=$(nix run nixpkgs#jq -- -r '.nodes.nixpkgs.locked.lastModified' flake.lock)
+          date_tag=$(date -u -d "@${last_modified}" +%Y%m%d)
+          echo "date_tag=${date_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Push image to registry
+        run: |
+          registry="docker://git.shine.town/infra/runners/nixos"
+          creds="forgejo_admin:${{ secrets.RUNNERS_PACKAGE_UPLOAD_KEY }}"
+          for tag in latest unstable "${{ steps.nixpkgs-date.outputs.date_tag }}"; do
+            nix run nixpkgs#skopeo -- copy \
+              --insecure-policy \
+              --dest-creds "$creds" \
+              docker-archive:nixos.tar.gz \
+              "${registry}:${tag}"
+          done
+
+  test-image:
+    needs: build-and-push
+    runs-on: nixos
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build runner image
+        run: nix build .#nixos

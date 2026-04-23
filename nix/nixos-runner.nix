@@ -73,7 +73,7 @@ let
 
     in
     pkgs.dockerTools.buildImage {
-      name = "nixos-unstable";
+      name = "nixos";
       tag = "latest";
 
       copyToRoot = [
