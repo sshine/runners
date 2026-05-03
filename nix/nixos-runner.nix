@@ -61,7 +61,7 @@ let
       nixConf = writeTextDir "etc/nix/nix.conf" ''
         build-users-group =
         experimental-features = nix-command flakes
-        sandbox = false
+        sandbox = true
         substituters = https://cache.nixos.org
         trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
         extra-platforms = x86_64-linux aarch64-linux
