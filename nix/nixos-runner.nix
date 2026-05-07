@@ -83,6 +83,7 @@ let
         sslCerts
         (runCommandLocal "root-dirs" { } ''
           mkdir -p $out/tmp
+          mkdir -p $out/var/tmp
           mkdir -p $out/root
           mkdir -p $out/nix/var/nix
           mkdir -p $out/etc
