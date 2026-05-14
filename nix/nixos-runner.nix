@@ -87,6 +87,9 @@ let
           mkdir -p $out/root
           mkdir -p $out/nix/var/nix
           mkdir -p $out/etc
+          mkdir -p $out/usr/bin
+          ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
+
           echo "root:x:0:0:root:/root:/bin/bash" > $out/etc/passwd
           echo "root:x:0:" > $out/etc/group
         '')
