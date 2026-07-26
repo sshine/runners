@@ -48,6 +48,7 @@
           pkgs.gnumake
           pkgs.cpio
           pkgs.nodejs
+          pkgs.skopeo
         ];
         pathsToLink = [
           "/bin"
