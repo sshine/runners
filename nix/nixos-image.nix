@@ -1,8 +1,7 @@
-{ lib, ... }:
-
-let
-  mkNixosRunner =
-    { pkgs }:
+{ ... }:
+{
+  perSystem =
+    { pkgs, ... }:
     let
       inherit (pkgs)
         runCommandLocal
@@ -73,46 +72,40 @@ let
       '';
 
     in
-    pkgs.dockerTools.buildImage {
-      name = "nixos";
-      tag = "latest";
+    {
+      packages.nixos = pkgs.dockerTools.buildImage {
+        name = "nixos";
+        tag = "latest";
 
-      copyToRoot = [
-        rootEnv
-        nixConf
-        sslCerts
-        (runCommandLocal "root-dirs" { } ''
-          mkdir -p $out/tmp
-          mkdir -p $out/var/tmp
-          mkdir -p $out/root
-          mkdir -p $out/nix/var/nix
-          mkdir -p $out/etc
-          mkdir -p $out/usr/bin
-          ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
+        copyToRoot = [
+          rootEnv
+          nixConf
+          sslCerts
+          (runCommandLocal "root-dirs" { } ''
+            mkdir -p $out/tmp
+            mkdir -p $out/var/tmp
+            mkdir -p $out/root
+            mkdir -p $out/nix/var/nix
+            mkdir -p $out/etc
+            mkdir -p $out/usr/bin
+            ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
 
-          echo "root:x:0:0:root:/root:/bin/bash" > $out/etc/passwd
-          echo "root:x:0:" > $out/etc/group
-        '')
-      ];
-
-      config = {
-        Cmd = [ "/bin/bash" ];
-        Env = [
-          "PATH=/bin"
-          "SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt"
-          "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt"
-          "NIX_PATH=nixpkgs=channel:nixpkgs-unstable"
-          "HOME=/root"
+            echo "root:x:0:0:root:/root:/bin/bash" > $out/etc/passwd
+            echo "root:x:0:" > $out/etc/group
+          '')
         ];
-        WorkingDir = "/root";
+
+        config = {
+          Cmd = [ "/bin/bash" ];
+          Env = [
+            "PATH=/bin"
+            "SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt"
+            "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt"
+            "NIX_PATH=nixpkgs=channel:nixpkgs-unstable"
+            "HOME=/root"
+          ];
+          WorkingDir = "/root";
+        };
       };
     };
-
-in
-{
-  options.lib.nixosRunner = lib.mkOption {
-    type = lib.types.raw;
-  };
-
-  config.lib.nixosRunner = mkNixosRunner;
 }
