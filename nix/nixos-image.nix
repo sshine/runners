@@ -46,6 +46,7 @@
           pkgs.which
           pkgs.file
           pkgs.gnumake
+          pkgs.just
           pkgs.cpio
           pkgs.nodejs
           pkgs.skopeo
