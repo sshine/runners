@@ -59,11 +59,15 @@
         ];
       };
 
+      # The in-cluster cache is an nginx proxy in front of cache.nixos.org that
+      # passes upstream signatures through, so it needs no key of its own. Keep
+      # cache.nixos.org listed after it: an outage there should slow builds down
+      # rather than break them.
       nixConf = writeTextDir "etc/nix/nix.conf" ''
         build-users-group =
         experimental-features = nix-command flakes
         sandbox = true
-        substituters = https://cache.nixos.org
+        substituters = http://nix-cache.nix-cache.svc.cluster.local:8080 https://cache.nixos.org
         trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
         extra-platforms = x86_64-linux aarch64-linux
       '';
