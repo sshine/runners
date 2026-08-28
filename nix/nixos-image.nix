@@ -22,6 +22,18 @@
         ln -s ${pkgs.nix}/bin/nix-copy-closure $out/bin/nix-copy-closure
       '';
 
+      # Jobs run as root, which suits nix: the store lives inside the container and only
+      # root can write it. Some tools refuse to run as root at all -- postgres' initdb
+      # is the one that started this -- so a step that needs an unprivileged user wraps
+      # itself in this rather than the workflow spelling out setpriv every time.
+      #
+      # Deliberately not an image-wide USER: that would take nix's store writes with it.
+      asRunner = pkgs.writeShellScriptBin "as-runner" ''
+        exec ${pkgs.util-linux}/bin/setpriv \
+          --reuid=1000 --regid=1000 --clear-groups \
+          env HOME=/home/runner "$@"
+      '';
+
       rootEnv = buildEnv {
         name = "root-env";
         paths = [
@@ -50,6 +62,10 @@
           pkgs.cpio
           pkgs.nodejs
           pkgs.skopeo
+          # Only the wrapper. util-linux itself stays off PATH, where it would take
+          # kill and more away from coreutils for every job; as-runner reaches setpriv
+          # by store path, so the closure is here either way.
+          asRunner
         ];
         pathsToLink = [
           "/bin"
@@ -96,10 +112,24 @@
             mkdir -p $out/usr/bin
             ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
 
+            # initdb calls getpwuid on its own uid and fails outright if it resolves to
+            # nothing, so as-runner's uid has to be a real entry rather than just a
+            # number handed to setpriv.
             echo "root:x:0:0:root:/root:/bin/bash" > $out/etc/passwd
+            echo "runner:x:1000:1000:runner:/home/runner:/bin/bash" >> $out/etc/passwd
             echo "root:x:0:" > $out/etc/group
+            echo "runner:x:1000:" >> $out/etc/group
           '')
         ];
+
+        # Store paths are read-only, so the two directories an unprivileged step writes
+        # to are made writable here instead. Ownership cannot be set without a VM build,
+        # and these containers are per-job anyway, so the modes carry it.
+        extraCommands = ''
+          mkdir -p tmp home/runner
+          chmod 1777 tmp
+          chmod 0777 home/runner
+        '';
 
         config = {
           Cmd = [ "/bin/bash" ];

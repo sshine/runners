@@ -34,3 +34,63 @@ push: build
         docker-archive:nixos.tar.gz \
         "docker://{{image}}:$tag"
     done
+
+# Assert the built image contains what jobs rely on
+#
+# Reads the layer rather than running a container: the nixos runner has no docker daemon,
+# and every claim below is about what is in the image rather than how it behaves.
+test-image: build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    workdir=$(mktemp -d)
+    # The layer preserves the store's read-only modes, so cleanup needs them back.
+    trap 'chmod -R u+w "$workdir" 2>/dev/null; rm -rf "$workdir"' EXIT
+
+    # Into a subdirectory: the tarball carries a mode for its own root, which would
+    # otherwise land on $workdir and make the listing below unwritable.
+    mkdir -p "$workdir/img"
+    tar -xf nixos.tar.gz -C "$workdir/img"
+    layer=$(find "$workdir/img" -name layer.tar | head -1)
+    [ -n "$layer" ] || { echo "no layer.tar in the image" >&2; exit 1; }
+
+    # Two listings: the verbose one carries modes, and the plain one is the only
+    # reliable way to ask whether a path exists, because a verbose line for a symlink
+    # ends in its target rather than in itself.
+    listing="$workdir/listing"
+    names="$workdir/names"
+    tar -tvf "$layer" > "$listing"
+    tar -tf "$layer" > "$names"
+
+    fail() { echo "FAIL: $*" >&2; exit 1; }
+
+    # initdb resolves its own uid through getpwuid and refuses a uid that is not there,
+    # which is what as-runner would otherwise hand it.
+    tar -xOf "$layer" ./etc/passwd | grep -q '^runner:x:1000:1000:' \
+      || fail "no runner:1000 in /etc/passwd"
+
+    # Store paths are read-only, so these two are the only places an unprivileged step
+    # can write. Postgres puts its cluster in one and Go its build cache in the other.
+    grep -qE '^drwxrwxrwt .* \./tmp/$' "$listing" || fail "/tmp is not 1777"
+    grep -qE '^drwxrwxrwx .* \./home/runner/$' "$listing" || fail "/home/runner is not writable"
+
+    # as-runner calls setpriv by store path rather than through PATH, so util-linux does
+    # not take kill and more away from coreutils for every other job. That only works if
+    # the binary it names is actually in the image.
+    runner_script=$(sed -n "s|^l.* \./bin/as-runner -> ||p" "$listing" | head -1)
+    [ -n "$runner_script" ] || fail "as-runner missing from /bin"
+    setpriv_path=$(tar -xOf "$layer" "${runner_script#/}" \
+      | grep -o '/nix/store/[^ ]*/bin/setpriv' | head -1)
+    [ -n "$setpriv_path" ] || fail "as-runner does not call setpriv by store path"
+    grep -qxF "${setpriv_path#/}" "$names" || fail "as-runner's setpriv is not in the image"
+
+    for tool in as-runner just node skopeo nix; do
+      # /bin is a tree of symlinks, so the entry reads "./bin/x -> /nix/store/...".
+      target=$(sed -n "s|^l.* \./bin/$tool -> ||p" "$listing" | head -1)
+      [ -n "$target" ] || fail "$tool missing from /bin"
+      # And the target has to be in the image too: a symlink to a store path that was
+      # never copied in passes any check on /bin alone, then fails on first use.
+      grep -qxF "${target#/}" "$names" \
+        || fail "$tool points at $target, which is not in the image"
+    done
+
+    echo "image contents ok"
