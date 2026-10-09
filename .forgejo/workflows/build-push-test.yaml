@@ -23,11 +23,33 @@ jobs:
           SKOPEO_DEST_CREDS: forgejo_admin:${{ secrets.RUNNERS_PACKAGE_UPLOAD_KEY }}
         run: nix run nixpkgs#just -- push
 
+      - name: Push the fallback daemon image
+        env:
+          SKOPEO_DEST_CREDS: forgejo_admin:${{ secrets.RUNNERS_PACKAGE_UPLOAD_KEY }}
+        run: nix run nixpkgs#just -- push-runner
+
+      - name: Mirror the Kubernetes backend plugin
+        env:
+          SKOPEO_DEST_CREDS: forgejo_admin:${{ secrets.RUNNERS_PACKAGE_UPLOAD_KEY }}
+        run: nix run nixpkgs#just -- mirror-plugin
+
   test-image:
     needs: build-and-push
     runs-on: nixos
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build runner image
-        run: nix run nixpkgs#just -- build
+      - name: Assert the image contents
+        run: just test-image
+
+  # The same assertions under the Kubernetes backend, where the plugin rather than
+  # dockerd holds the container open and moves files in and out of it. Running the
+  # pair is the point: they prove the image satisfies both execution paths.
+  test-image-k8s:
+    needs: build-and-push
+    runs-on: nixos-k8s
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert the image contents
+        run: just test-image

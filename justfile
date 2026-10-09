@@ -1,10 +1,17 @@
 image := "git.shine.town/infra/runners/nixos"
+runner_image := "git.shine.town/infra/runners/forgejo-runner"
+plugin_image := "git.shine.town/infra/runners/forgejo-runner-k8s"
+plugin_upstream := "git.erwanleboucher.dev/eleboucher/runner-k8s-plugin"
+plugin_version := "13.2.1"
 
 list:
     @just --list --unsorted
 
 build:
     nix build .#nixos -o nixos.tar.gz
+
+build-runner:
+    nix build .#runner -o forgejo-runner.tar.gz
 
 bump:
     nix flake update
@@ -34,6 +41,39 @@ push: build
         docker-archive:nixos.tar.gz \
         "docker://{{image}}:$tag"
     done
+
+# Push the fallback daemon image as :latest and :<forgejo-runner version>
+#
+# The cluster pulls the official daemon image. This one only has to exist and build.
+push-runner: build-runner
+    #!/usr/bin/env bash
+    set -euo pipefail
+    version=$(nix eval --raw .#runner.imageTag)
+    args=""
+    if [ -n "${SKOPEO_DEST_CREDS:-}" ]; then
+      args="--dest-creds $SKOPEO_DEST_CREDS"
+    fi
+    for tag in latest "$version"; do
+      nix run nixpkgs#skopeo -- copy --insecure-policy $args \
+        docker-archive:forgejo-runner.tar.gz \
+        "docker://{{runner_image}}:$tag"
+    done
+
+# Mirror the Kubernetes backend plugin into the cluster's registry
+#
+# The plugin is a third party on a personal forge, and the runner pod will not start
+# without its sidecar. Copying it here keeps that forge out of the pull path.
+# --all carries every architecture in the manifest list rather than just this host's.
+mirror-plugin:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    args=""
+    if [ -n "${SKOPEO_DEST_CREDS:-}" ]; then
+      args="--dest-creds $SKOPEO_DEST_CREDS"
+    fi
+    nix run nixpkgs#skopeo -- copy --all --insecure-policy $args \
+      "docker://{{plugin_upstream}}:{{plugin_version}}" \
+      "docker://{{plugin_image}}:{{plugin_version}}"
 
 # Assert the built image contains what jobs rely on
 #
@@ -89,6 +129,17 @@ test-image: build
       [ -n "$target" ] || fail "$tool missing from /bin"
       # And the target has to be in the image too: a symlink to a store path that was
       # never copied in passes any check on /bin alone, then fails on first use.
+      grep -qxF "${target#/}" "$names" \
+        || fail "$tool points at $target, which is not in the image"
+    done
+
+    # Under the Kubernetes backend the plugin, not the workflow, reaches into the
+    # container: it holds it open with `sh -c "mkdir -p ... && sleep"` and moves files
+    # with `tar cf -` and `tar xzf -`. Those four are resolved through PATH, so an
+    # image that drops any of them fails every job on that label at once.
+    for tool in sh mkdir tar gzip; do
+      target=$(sed -n "s|^l.* \./bin/$tool -> ||p" "$listing" | head -1)
+      [ -n "$target" ] || fail "$tool missing from /bin, needed by the k8s backend"
       grep -qxF "${target#/}" "$names" \
         || fail "$tool points at $target, which is not in the image"
     done
