@@ -83,6 +83,12 @@
         build-users-group =
         experimental-features = nix-command flakes
         sandbox = true
+        # sandbox = true is a request, not a guarantee: nix builds without one whenever
+        # the kernel namespaces are unavailable, and says so only at debug level. Those
+        # builds run impure and usually still pass, until one leaves /homeless-shelter
+        # behind and every later build in the container refuses to start. Failing where
+        # the sandbox is lost costs one clear error instead of a chain of odd ones.
+        sandbox-fallback = false
         substituters = http://nix-cache.nix-cache.svc.cluster.local:8080 https://cache.nixos.org
         trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
         extra-platforms = x86_64-linux aarch64-linux

@@ -103,6 +103,13 @@ test-image: build
 
     fail() { echo "FAIL: $*" >&2; exit 1; }
 
+    # Without this nix answers a failed sandbox by building impurely and saying so only
+    # at debug level, which surfaces much later as /homeless-shelter already existing.
+    tar -xOf "$layer" ./etc/nix/nix.conf | grep -qx 'sandbox = true' \
+      || fail "nix.conf does not set sandbox = true"
+    tar -xOf "$layer" ./etc/nix/nix.conf | grep -qx 'sandbox-fallback = false' \
+      || fail "nix.conf does not set sandbox-fallback = false"
+
     # initdb resolves its own uid through getpwuid and refuses a uid that is not there,
     # which is what as-runner would otherwise hand it.
     tar -xOf "$layer" ./etc/passwd | grep -q '^runner:x:1000:1000:' \
